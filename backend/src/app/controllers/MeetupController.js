@@ -67,7 +67,7 @@ class MeetupController {
      * Check if user is the owner
      */
     if (req.body.user_id !== req.userId) {
-      return res.status(400).json({ error: 'User must be the owner' });
+      return res.status(401).json({ error: 'User is not the owner' });
     }
 
     /**
@@ -84,6 +84,18 @@ class MeetupController {
     );
 
     return res.json({ id, title, description, data, location });
+  }
+
+  async delete(req, res) {
+    const meetup = await Meetup.findByPk(req.params.id);
+
+    if (meetup.user_id !== req.userId) {
+      return res.status(401).json({ error: 'User is not the owner' });
+    }
+
+    await meetup.destroy();
+
+    return res.json({ message: 'The register was deleted successfully' });
   }
 }
 export default new MeetupController();

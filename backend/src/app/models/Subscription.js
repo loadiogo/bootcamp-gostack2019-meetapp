@@ -2,7 +2,7 @@ import { Model } from 'sequelize';
 
 class Subscription extends Model {
   static init(sequelize) {
-    super.init({}, sequelize);
+    super.init({}, { sequelize });
     return this;
   }
 
