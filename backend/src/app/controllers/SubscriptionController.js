@@ -9,7 +9,7 @@ class SubscriptionController {
     return res.json({});
   }
 
-  async create(req, res) {
+  async store(req, res) {
     const meetup = await Meetup.findByPk(req.meetup_id, {
       attributes: ['id', 'title', 'description', 'date', 'location'],
       include: [

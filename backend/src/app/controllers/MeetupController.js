@@ -93,6 +93,12 @@ class MeetupController {
       return res.status(401).json({ error: 'User is not the owner' });
     }
 
+    if (isBefore(parseISO(req.body.date), new Date())) {
+      return res
+        .status(400)
+        .json({ error: 'Cannot delete meetups that already happened' });
+    }
+
     await meetup.destroy();
 
     return res.json({ message: 'The register was deleted successfully' });
