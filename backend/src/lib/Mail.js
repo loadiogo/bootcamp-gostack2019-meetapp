@@ -36,6 +36,13 @@ class Mail {
       })
     );
   }
+
+  sendMail(message) {
+    return this.transporter.sendMail({
+      ...mailConfig.default,
+      ...message,
+    });
+  }
 }
 
 export default new Mail();

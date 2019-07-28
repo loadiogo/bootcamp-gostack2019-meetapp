@@ -1,17 +1,54 @@
 import { isBefore, parseISO } from 'date-fns';
+import { Op } from 'sequelize';
 
 import Subscription from '../models/Subscription';
 import Meetup from '../models/Meetup';
 import User from '../models/User';
+import Queue from '../../lib/Queue';
+import SubscriptionMail from '../jobs/SubscriptionMail';
+import File from '../models/File';
 
 class SubscriptionController {
   async index(req, res) {
-    return res.json({});
+    const subscriptions = await Subscription.findAll({
+      where: {
+        user_id: req.userId,
+      },
+      include: [
+        {
+          model: Meetup,
+          required: true,
+          where: {
+            date: {
+              [Op.gt]: new Date(),
+            },
+          },
+          include: [
+            {
+              model: User,
+              attributes: ['name', 'email'],
+            },
+            {
+              model: File,
+              attributes: ['name', 'path', 'url'],
+            },
+          ],
+        },
+        {
+          model: User,
+          as: 'subscriber',
+          attributes: ['name', 'email'],
+        },
+      ],
+    });
+
+    return res.json(subscriptions);
   }
 
   async store(req, res) {
-    const meetup = await Meetup.findByPk(req.meetup_id, {
-      attributes: ['id', 'title', 'description', 'date', 'location'],
+    const user = await User.findByPk(req.userId);
+    const { meetupId } = req.params;
+    const meetup = await Meetup.findByPk(meetupId, {
       include: [
         {
           model: User,
@@ -20,10 +57,14 @@ class SubscriptionController {
       ],
     });
 
+    if (!meetup) {
+      return res.status(400).json({ error: 'Meetup does not exist' });
+    }
+
     /**
      * Check if user is the meetup owner
      */
-    if (meetup.user_id === req.user_id) {
+    if (meetup.user_id === req.userId) {
       return res
         .status(401)
         .json({ error: 'Cannot subscribe to owned meetups' });
@@ -40,7 +81,7 @@ class SubscriptionController {
 
     const alreadySubscribed = await Subscription.findOne({
       where: {
-        id: meetup.id,
+        meetup_id: meetupId,
         user_id: req.userId,
       },
     });
@@ -52,8 +93,16 @@ class SubscriptionController {
     const sameTimeMeetup = await Subscription.findOne({
       where: {
         user_id: req.userId,
-        date: meetup.date,
       },
+      include: [
+        {
+          model: Meetup,
+          required: true,
+          where: {
+            date: meetup.date,
+          },
+        },
+      ],
     });
 
     if (sameTimeMeetup) {
@@ -62,7 +111,17 @@ class SubscriptionController {
       });
     }
 
-    return res.json({});
+    const subscription = await Subscription.create({
+      user_id: req.userId,
+      meetup_id: meetupId,
+    });
+
+    await Queue.add(SubscriptionMail.key, {
+      meetup,
+      user,
+    });
+
+    return res.json(subscription);
   }
 }
 
